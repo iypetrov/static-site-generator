@@ -7,6 +7,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -21,6 +22,7 @@ import com.example.staticsitegenerator.CreateAttachmentCustomDomainToBucketReque
 import com.example.staticsitegenerator.StaticSiteResponseDTO;
 
 // TODOs:
+// - Split to cotrollers & services & repositories
 // - Add error handling for file uploads
 // - Use https://resilience4j.readme.io for retry logic
 @RestController
@@ -46,21 +48,17 @@ public class StaticSiteHandler {
     )
     public ResponseEntity<StaticSiteResponseDTO> createStaticSite(
         @RequestParam String name,
-        @RequestParam String owner,
         @RequestParam("files") List<MultipartFile> files
     ) {
         try {
             generateBucket(name);
             attachCustomDomainToBucket(name);
-
             return ResponseEntity
                     .status(HttpStatus.CREATED)
                     .body(new StaticSiteResponseDTO("valid url"));
         } catch (Exception ex) {
             System.err.println("Error creating static site: " + ex.getMessage());
-            return ResponseEntity
-                .status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(new StaticSiteResponseDTO("invalid url"));
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
 
@@ -92,5 +90,28 @@ public class StaticSiteHandler {
         );
         HttpEntity<CreateAttachmentCustomDomainToBucketRequest> entity = new HttpEntity<>(requestBody, headers);
         ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.POST, entity, Map.class);
+    }
+
+    @DeleteMapping("/generator")
+    public ResponseEntity<Void> deleteStaticSite(@RequestParam String name) {
+        try {
+            deleteBucket(name);     
+            return ResponseEntity.noContent().build();
+        } catch (Exception ex) {
+            System.err.println("Error deleting bucket: " + ex.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    private void deleteBucket(String name) {
+        String url = "https://api.cloudflare.com/client/v4/accounts/" + accountId + "/r2/buckets/" + name;
+
+        RestTemplate restTemplate = new RestTemplate();
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.setBearerAuth(apiKey);
+
+        HttpEntity<Void> entity = new HttpEntity<>(headers);
+        restTemplate.exchange(url, HttpMethod.DELETE, entity, Void.class);
     }
 }
