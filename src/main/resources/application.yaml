@@ -3,5 +3,7 @@ spring:
     name: "static-site-generator"
 
 cloudflare:
+  zoneId: ""
   accountId: ""
   apiKey: ""
+  domain: ""

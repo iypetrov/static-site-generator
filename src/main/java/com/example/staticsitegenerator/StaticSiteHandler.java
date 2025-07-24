@@ -17,15 +17,25 @@ import java.util.List;
 import java.util.Map;
 
 import com.example.staticsitegenerator.CreateBucketRequest;
+import com.example.staticsitegenerator.CreateAttachmentCustomDomainToBucketRequest;
 import com.example.staticsitegenerator.StaticSiteResponseDTO;
 
+// TODOs:
+// - Add error handling for file uploads
+// - Use https://resilience4j.readme.io for retry logic
 @RestController
 public class StaticSiteHandler {
+    @Value("${cloudflare.zoneId}")
+    private String zoneId;
+
     @Value("${cloudflare.accountId}")
     private String accountId;
 
     @Value("${cloudflare.apiKey}")
     private String apiKey;
+
+    @Value("${cloudflare.domain}")
+    private String domain;
 
     public StaticSiteHandler() {
     }
@@ -40,23 +50,8 @@ public class StaticSiteHandler {
         @RequestParam("files") List<MultipartFile> files
     ) {
         try {
-            // Create R2 bucket for each static site
-            String url = "https://api.cloudflare.com/client/v4/accounts/" + accountId + "/r2/buckets";
-
-            RestTemplate restTemplate = new RestTemplate();
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_JSON);
-            headers.setBearerAuth(apiKey);
-
-            CreateBucketRequest createBucketRequest = new CreateBucketRequest(name, "eeur");
-            HttpEntity<CreateBucketRequest> entity = new HttpEntity<>(createBucketRequest, headers);
-            ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.POST, entity, Map.class);
-            if (response.getStatusCode() != HttpStatus.OK) {
-                System.err.println("Failed to create bucket: " + response.getBody());
-                return ResponseEntity
-                        .status(HttpStatus.INTERNAL_SERVER_ERROR)
-                        .body(new StaticSiteResponseDTO("Failed to create bucket"));
-            }
+            generateBucket(name);
+            attachCustomDomainToBucket(name);
 
             return ResponseEntity
                     .status(HttpStatus.CREATED)
@@ -64,8 +59,38 @@ public class StaticSiteHandler {
         } catch (Exception ex) {
             System.err.println("Error creating static site: " + ex.getMessage());
             return ResponseEntity
-                    .status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(new StaticSiteResponseDTO("invalid url"));
+                .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(new StaticSiteResponseDTO("invalid url"));
         }
+    }
+
+    private void generateBucket(String name) {
+        String url = "https://api.cloudflare.com/client/v4/accounts/" + accountId + "/r2/buckets";
+
+        RestTemplate restTemplate = new RestTemplate();
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.setBearerAuth(apiKey);
+
+        CreateBucketRequest requestBody = new CreateBucketRequest(name, "eeur");
+        HttpEntity<CreateBucketRequest> entity = new HttpEntity<>(requestBody, headers);
+        ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.POST, entity, Map.class);
+    }
+
+    private void attachCustomDomainToBucket(String bucketName) {
+        String url = "https://api.cloudflare.com/client/v4/accounts/" + accountId + "/r2/buckets/" + bucketName + "/domains/custom";
+
+        RestTemplate restTemplate = new RestTemplate();
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.setBearerAuth(apiKey);
+
+        CreateAttachmentCustomDomainToBucketRequest requestBody = new CreateAttachmentCustomDomainToBucketRequest(
+                bucketName + "." + domain, 
+                true, 
+                zoneId
+        );
+        HttpEntity<CreateAttachmentCustomDomainToBucketRequest> entity = new HttpEntity<>(requestBody, headers);
+        ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.POST, entity, Map.class);
     }
 }
