@@ -34,7 +34,7 @@ import com.example.staticsitegenerator.StaticSiteResponseDTO;
 // https://developers.cloudflare.com/api/resources/r2
 // https://developers.cloudflare.com/r2/examples/aws/aws-sdk-java
 // TODOs:
-// - Split to cotrollers & services & repositories
+// - Split to controllers & services & repositories
 // - Add error handling for file uploads
 // - Use https://resilience4j.readme.io for retry logic
 @RestController
