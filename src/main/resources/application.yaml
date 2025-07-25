@@ -7,3 +7,7 @@ cloudflare:
   accountId: ""
   apiKey: ""
   domain: ""
+  r2:
+    accessKey: ""
+    secretKey: ""
+    endpoint: ""
